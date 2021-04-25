@@ -27,10 +27,13 @@ class WalkerBase(MJCFBasedRobot):
     self.scene.actor_introduce(self)
     self.initial_z = None
 
-  def apply_action(self, a):
+  def apply_action(self, a, clock, anomalous_power, anomaly_injection):
     assert (np.isfinite(a).all())
     for n, j in enumerate(self.ordered_joints):
-      j.set_motor_torque(self.power * j.power_coef * float(np.clip(a[n], -1, +1)))
+      if anomaly_injection is None or clock < anomaly_injection:
+        j.set_motor_torque(self.power * j.power_coef * float(np.clip(a[n], -1, +1)))
+      else:
+        j.set_motor_torque(anomalous_power * j.power_coef * float(np.clip(a[n], -1, +1)))
 
   def calc_state(self):
     j = np.array([j.current_relative_position() for j in self.ordered_joints],

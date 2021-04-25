@@ -7,13 +7,16 @@ from robot_locomotors import Hopper, Walker2D, HalfCheetah, Ant, Humanoid, Human
 
 class WalkerBaseBulletEnv(MJCFBaseBulletEnv):
 
-  def __init__(self, robot, render=False):
+  def __init__(self, robot, render=False, power=None, anomaly_injection=None):
     # print("WalkerBase::__init__ start")
     self.camera_x = 0
     self.walk_target_x = 1e3  # kilometer away
     self.walk_target_y = 0
     self.stateId = -1
     MJCFBaseBulletEnv.__init__(self, robot, render)
+    self.clock = None
+    self.power = power
+    self.anomaly_injection = anomaly_injection
 
 
   def create_single_player_scene(self, bullet_client):
@@ -25,6 +28,7 @@ class WalkerBaseBulletEnv(MJCFBaseBulletEnv):
 
 
   def reset(self):
+    self.clock = 0
     if (self.stateId >= 0):
       #print("restoreState self.stateId:",self.stateId)
       self._p.restoreState(self.stateId)
@@ -62,8 +66,9 @@ class WalkerBaseBulletEnv(MJCFBaseBulletEnv):
   joints_at_limit_cost = -0.1  # discourage stuck joints
 
   def step(self, a):
+    self.clock += 1
     if not self.scene.multiplayer:  # if multiplayer, action first applied to all robots, then global step() called, then _step() for all robots with the same actions
-      self.robot.apply_action(a)
+      self.robot.apply_action(a, self.clock, self.power, self.anomaly_injection)
       self.scene.global_step()
 
     state = self.robot.calc_state()  # also calculates self.joints_at_limit
@@ -134,23 +139,23 @@ class WalkerBaseBulletEnv(MJCFBaseBulletEnv):
 
 class HopperBulletEnv(WalkerBaseBulletEnv):
 
-  def __init__(self, render=False):
+  def __init__(self, render=False, power=None, anomaly_injection=None):
     self.robot = Hopper()
-    WalkerBaseBulletEnv.__init__(self, self.robot, render)
+    WalkerBaseBulletEnv.__init__(self, self.robot, render, power=power, anomaly_injection=anomaly_injection)
 
 
 class Walker2DBulletEnv(WalkerBaseBulletEnv):
 
-  def __init__(self, render=False):
+  def __init__(self, render=False, power=None, anomaly_injection=None):
     self.robot = Walker2D()
-    WalkerBaseBulletEnv.__init__(self, self.robot, render)
+    WalkerBaseBulletEnv.__init__(self, self.robot, render, power=power, anomaly_injection=anomaly_injection)
 
 
 class HalfCheetahBulletEnv(WalkerBaseBulletEnv):
 
-  def __init__(self, render=False):
+  def __init__(self, render=False, power=None, anomaly_injection=None):
     self.robot = HalfCheetah()
-    WalkerBaseBulletEnv.__init__(self, self.robot, render)
+    WalkerBaseBulletEnv.__init__(self, self.robot, render, power=power, anomaly_injection=anomaly_injection)
 
   def _isDone(self):
     return False
@@ -158,9 +163,9 @@ class HalfCheetahBulletEnv(WalkerBaseBulletEnv):
 
 class AntBulletEnv(WalkerBaseBulletEnv):
 
-  def __init__(self, render=False):
+  def __init__(self, render=False, power=None, anomaly_injection=None):
     self.robot = Ant()
-    WalkerBaseBulletEnv.__init__(self, self.robot, render)
+    WalkerBaseBulletEnv.__init__(self, self.robot, render, power=power, anomaly_injection=anomaly_injection)
 
 
 class HumanoidBulletEnv(WalkerBaseBulletEnv):
