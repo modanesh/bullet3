@@ -1,3 +1,5 @@
+import random
+
 from .scene_stadium import SinglePlayerStadiumScene
 from .env_bases import MJCFBaseBulletEnv
 import numpy as np
@@ -7,7 +9,7 @@ from robot_locomotors import Hopper, Walker2D, HalfCheetah, Ant, Humanoid, Human
 
 class WalkerBaseBulletEnv(MJCFBaseBulletEnv):
 
-  def __init__(self, robot, render=False, power=None, anomaly_injection=None):
+  def __init__(self, robot, render=False, power=None, anomaly_injection=None, case=None):
     # print("WalkerBase::__init__ start")
     self.camera_x = 0
     self.walk_target_x = 1e3  # kilometer away
@@ -17,6 +19,10 @@ class WalkerBaseBulletEnv(MJCFBaseBulletEnv):
     self.clock = None
     self.power = power
     self.anomaly_injection = anomaly_injection
+    self.selected_sensors = np.zeros(self.observation_space.shape[0])
+    self.selected_sensors[: int(len(self.selected_sensors) / 3)] = 1
+    np.random.shuffle(self.selected_sensors)
+    self.case = case
 
 
   def create_single_player_scene(self, bullet_client):
@@ -44,7 +50,9 @@ class WalkerBaseBulletEnv(MJCFBaseBulletEnv):
     if (self.stateId < 0):
       self.stateId = self._p.saveState()
       #print("saving state self.stateId:",self.stateId)
-
+    self.selected_sensors = np.zeros(self.observation_space.shape[0])
+    self.selected_sensors[: int(len(self.selected_sensors) / 3)] = 1
+    np.random.shuffle(self.selected_sensors)
     return r
 
   def _isDone(self):
@@ -68,7 +76,10 @@ class WalkerBaseBulletEnv(MJCFBaseBulletEnv):
   def step(self, a):
     self.clock += 1
     if not self.scene.multiplayer:  # if multiplayer, action first applied to all robots, then global step() called, then _step() for all robots with the same actions
-      self.robot.apply_action(a, self.clock, self.power, self.anomaly_injection)
+      if self.case == 0:
+        self.robot.apply_action(a, self.clock, self.power, self.anomaly_injection)
+      else:
+        self.robot.apply_action(a, self.clock, None, None)
       self.scene.global_step()
 
     state = self.robot.calc_state()  # also calculates self.joints_at_limit
@@ -128,6 +139,31 @@ class WalkerBaseBulletEnv(MJCFBaseBulletEnv):
     self.HUD(state, a, done)
     self.reward += sum(self.rewards)
 
+    if self.anomaly_injection is not None and self.clock > self.anomaly_injection:
+      for sensor_i, sensor in enumerate(self.selected_sensors):
+        if sensor:
+          # Add IID noise
+          if self.case == 1:
+            if self.spec.id.__contains__("Ant") or self.spec.id.__contains__("Hopper"):
+              state[sensor_i] = state[sensor_i] + random.gauss(0, 1)
+            elif self.spec.id.__contains__("HalfCheetah") or self.spec.id.__contains__("Walker2D"):
+              state[sensor_i] = state[sensor_i] + random.gauss(0, 0.12)
+          # Add sensor shutdown noise
+          elif self.case == 2:
+            state[sensor_i] = 0
+          # Add calibration failure noise
+          elif self.case == 3:
+            if self.spec.id.__contains__("Ant"):
+              state[sensor_i] = state[sensor_i] * 2
+            elif self.spec.id.__contains__("Hopper") or self.spec.id.__contains__("HalfCheetah") or self.spec.id.__contains__("Walker2D"):
+              state[sensor_i] = state[sensor_i] * 1.25
+          # Add sensor drift noise
+          elif self.case == 4:
+            if self.spec.id.__contains__("Ant"):
+              state[sensor_i] = state[sensor_i] + self.clock / 1000
+            elif self.spec.id.__contains__("Hopper") or self.spec.id.__contains__("HalfCheetah") or self.spec.id.__contains__("Walker2D"):
+              state[sensor_i] = state[sensor_i] + self.clock / 5000
+
     return state, sum(self.rewards), bool(done), {}
 
   def camera_adjust(self):
@@ -139,23 +175,23 @@ class WalkerBaseBulletEnv(MJCFBaseBulletEnv):
 
 class HopperBulletEnv(WalkerBaseBulletEnv):
 
-  def __init__(self, render=False, power=None, anomaly_injection=None):
+  def __init__(self, render=False, power=None, anomaly_injection=None, case=None):
     self.robot = Hopper()
-    WalkerBaseBulletEnv.__init__(self, self.robot, render, power=power, anomaly_injection=anomaly_injection)
+    WalkerBaseBulletEnv.__init__(self, self.robot, render, power=power, anomaly_injection=anomaly_injection, case=case)
 
 
 class Walker2DBulletEnv(WalkerBaseBulletEnv):
 
-  def __init__(self, render=False, power=None, anomaly_injection=None):
+  def __init__(self, render=False, power=None, anomaly_injection=None, case=None):
     self.robot = Walker2D()
-    WalkerBaseBulletEnv.__init__(self, self.robot, render, power=power, anomaly_injection=anomaly_injection)
+    WalkerBaseBulletEnv.__init__(self, self.robot, render, power=power, anomaly_injection=anomaly_injection, case=case)
 
 
 class HalfCheetahBulletEnv(WalkerBaseBulletEnv):
 
-  def __init__(self, render=False, power=None, anomaly_injection=None):
+  def __init__(self, render=False, power=None, anomaly_injection=None, case=None):
     self.robot = HalfCheetah()
-    WalkerBaseBulletEnv.__init__(self, self.robot, render, power=power, anomaly_injection=anomaly_injection)
+    WalkerBaseBulletEnv.__init__(self, self.robot, render, power=power, anomaly_injection=anomaly_injection, case=case)
 
   def _isDone(self):
     return False
@@ -163,9 +199,9 @@ class HalfCheetahBulletEnv(WalkerBaseBulletEnv):
 
 class AntBulletEnv(WalkerBaseBulletEnv):
 
-  def __init__(self, render=False, power=None, anomaly_injection=None):
+  def __init__(self, render=False, power=None, anomaly_injection=None, case=None):
     self.robot = Ant()
-    WalkerBaseBulletEnv.__init__(self, self.robot, render, power=power, anomaly_injection=anomaly_injection)
+    WalkerBaseBulletEnv.__init__(self, self.robot, render, power=power, anomaly_injection=anomaly_injection, case=case)
 
 
 class HumanoidBulletEnv(WalkerBaseBulletEnv):
