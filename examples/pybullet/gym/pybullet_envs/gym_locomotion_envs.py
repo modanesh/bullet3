@@ -160,9 +160,11 @@ class WalkerBaseBulletEnv(MJCFBaseBulletEnv):
           # Add sensor drift noise
           elif self.case == 4:
             if self.spec.id.__contains__("Ant"):
-              state[sensor_i] = state[sensor_i] + self.clock / 1000
+              # state[sensor_i] = state[sensor_i] + self.clock / 1000
+              state[sensor_i] = state[sensor_i] + self.clock / 10000
             elif self.spec.id.__contains__("Hopper") or self.spec.id.__contains__("HalfCheetah") or self.spec.id.__contains__("Walker2D"):
-              state[sensor_i] = state[sensor_i] + self.clock / 5000
+              # state[sensor_i] = state[sensor_i] + self.clock / 5000
+              state[sensor_i] = state[sensor_i] + self.clock / 50000
 
     return state, sum(self.rewards), bool(done), {}
 
